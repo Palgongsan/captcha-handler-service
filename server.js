@@ -1,6 +1,7 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const fetch = require('node-fetch');
+const { registerPendingRequest } = require('./telegram-handler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -90,6 +91,9 @@ app.post('/detect-captcha', async (req, res) => {
     const sent = await sendImageToTelegram(imageBuffer);
     
     if (sent) {
+      // Register this as a pending request to handle the response
+      registerPendingRequest(parseInt(TELEGRAM_CHAT_ID), 'captcha-request-1');
+      
       return res.json({ 
         success: true, 
         message: 'Captcha detected and sent to Telegram. Waiting for user input...' 

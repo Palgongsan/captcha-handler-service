@@ -1,7 +1,5 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-const fetch = require('node-fetch');
-const { registerPendingRequest } = require('./telegram-handler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +18,7 @@ async function initBrowser() {
   try {
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -54,26 +53,40 @@ async function sendImageToTelegram(imageBuffer, caption = 'Please enter the secu
     });
 
     const result = await response.json();
-    return result.ok;
+    if (!response.ok || !result.ok) {
+      console.error('Telegram sendPhoto failed:', result.description || response.statusText);
+      return false;
+    }
+    return true;
   } catch (error) {
     console.error('Failed to send image to Telegram:', error);
     return false;
   }
 }
 
+app.get('/healthz', (_req, res) => {
+  res.json({ ok: true, browser: Boolean(browser) });
+});
+
 // Detect and handle captcha
 app.post('/detect-captcha', async (req, res) => {
   const { url, selector } = req.body;
+
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'url is required' });
+  }
 
   if (!browser) {
     return res.status(500).json({ error: 'Browser not initialized' });
   }
 
+  let page;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
     
     // Navigate to page
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
     
     // Capture captcha image - using a default selector if none provided
     const defaultSelector = 'img[src*="captcha"], img[src*="security"]';
@@ -91,9 +104,6 @@ app.post('/detect-captcha', async (req, res) => {
     const sent = await sendImageToTelegram(imageBuffer);
     
     if (sent) {
-      // Register this as a pending request to handle the response
-      registerPendingRequest(parseInt(TELEGRAM_CHAT_ID), 'captcha-request-1');
-      
       return res.json({ 
         success: true, 
         message: 'Captcha detected and sent to Telegram. Waiting for user input...' 
@@ -104,6 +114,10 @@ app.post('/detect-captcha', async (req, res) => {
   } catch (error) {
     console.error('Error detecting captcha:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    if (page) {
+      await page.close().catch(() => {});
+    }
   }
 });
 

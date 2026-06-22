@@ -1,1 +1,17 @@
-{"name": "captcha-handler", "version": "1.0.0", "description": "Handles captcha detection and telegram notification", "main": "server.js", "scripts": {"start": "node server.js"}, "dependencies": {"express": "^4.18.2", "puppeteer": "^21.0.0", "node-fetch": "^2.6.7", "ws": "^8.13.0", "node-telegram-bot-api": "^0.64.0"}}
+{
+  "name": "captcha-handler-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Render service for detecting captcha images and sending them to Telegram.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^24.15.0"
+  }
+}
